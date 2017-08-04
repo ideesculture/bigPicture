@@ -90,21 +90,27 @@ class PicturesController extends ActionController
         //error_reporting(E_ALL);
         $typeAccepted = $this->opo_config->getAssoc('TypeAccepted');
         $targetDir = __CA_BASE_DIR__ . '/media/bigPicture/';
+        $debug = 1;
+        
+        $log_file = $targetDir."/log.txt";
         if (!is_dir($targetDir)) {
             $result = mkdir($targetDir, 0777, true);
         }
         $targetFilePath = $targetDir . basename($_FILES["file"]["name"]);
 
         if (isset($_POST['bigPic']) && isset($_POST['name'])) {
+	        if($debug) {file_put_contents($log_file, "bigPic posted\n" , FILE_APPEND | LOCK_EX);}
             $id = $_POST['name'];
             $file = $_FILES['file'];
             $extension = strrchr($file['name'], '.');
             if (!is_file($file["tmp_name"])) {
+	            if($debug) {file_put_contents($log_file, "pas de fichier uploadé\n" , FILE_APPEND | LOCK_EX);}
                 die("pas de fichier uploadé.");
             }
             if (in_array($extension, $typeAccepted)) {
+	            if($debug) {file_put_contents($log_file, "fichier accepté\n" , FILE_APPEND | LOCK_EX);}
                 if (move_uploaded_file($file["tmp_name"], $targetFilePath)) {
-
+		            if($debug) {file_put_contents($log_file, "fichier copie dans temp : ".$targetFilePath."\n" , FILE_APPEND | LOCK_EX);}
                     // Getting the dimensions of the pictures
                     $dimensions = $this->getDimensions($targetFilePath)["dimensions"];
                     $width = $dimensions[0];
@@ -118,17 +124,25 @@ class PicturesController extends ActionController
                     // if the file is too big
                     if ($width > 6000 || $height > 6000) {
                         $resize_on = ($width > $height ? "width" : "height");
+			            if($debug) {file_put_contents($log_file, "dimension supérieure à 6000 : ".$width."x".$height." (".$resize_on.") \n" , FILE_APPEND | LOCK_EX);}
                         $original_filename = $targetFilePath;
                         $path_parts = pathinfo($targetFilePath);
                         $resizedFilePath = $path_parts['dirname'] . DIRECTORY_SEPARATOR . $path_parts['filename'] . "_resized.jpg";
                         $command = "convert -resize 6000 " . caEscapeShellArg($targetFilePath) . " " . caEscapeShellArg($resizedFilePath);
-                        exec($command, $output);
+			            if($debug) {file_put_contents($log_file, "resize command : \n" , FILE_APPEND | LOCK_EX);}
+			            if($debug) {file_put_contents($log_file, $command."\n" , FILE_APPEND | LOCK_EX);}
+			            
+			            exec($command, $output);
+			            if($debug) {file_put_contents($log_file, $output."\n" , FILE_APPEND | LOCK_EX);}
                         if ($output != array()) {
                             die("probleme lors du redimensionnement.");
                         }
                         $targetFilePath = $resizedFilePath;
                         $this->notification->addNotification(_t("Big picture treated, it has been downgraded to 6000px on upload."), __NOTIFICATION_TYPE_INFO__);
                         //['_uploaded_file'] ['tmp_name']
+
+			            if($debug) {file_put_contents($log_file, "ajout valeur bigPicture_originals\n" , FILE_APPEND | LOCK_EX);}
+			            
                         $obj->addAttribute(array(
                             'locale_id' => 2,
                             'bigPicture_originals' => $original_filename
@@ -138,6 +152,9 @@ class PicturesController extends ActionController
                             return false;
                         }
                         $obj->update();
+
+			            if($debug) {file_put_contents($log_file, "ajout valeur bigPicture_originals\n" , FILE_APPEND | LOCK_EX);}
+
                     }
                     //Getting the representation id of the object
                     /*                        $vt_rep = new ca_object_representations();
@@ -151,8 +168,8 @@ class PicturesController extends ActionController
                                         $status     = $vt_rep->get("status");
                                         $access     = $vt_rep->get("access");*/
 
-                    var_dump($obj->get("ca_objects.preferred_labels.name"));
-                    $result = $obj->addRepresentation($targetFilePath, 182, 2, 4, 2, 1);
+                    //var_dump($obj->get("ca_objects.preferred_labels.name"));
+                    $result = $obj->addRepresentation($targetFilePath, 132, 2, 4, 2, 1);
                     $obj->update();
                     if (!$result) {
                         //Probleme de type probablement
